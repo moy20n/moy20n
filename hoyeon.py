@@ -1,64 +1,105 @@
 import streamlit as st
-import time
 import random
 
-st.subheader("⚡ 반응속도 테스트")
+st.set_page_config("🧠 끝말잇기 풀옵션", layout="centered")
+st.title("🧠 끝말잇기 챌린지 (단어 뜻 + 메모장 버전)")
 
-# 초기 상태 설정
-# test_state는 앱의 현재 진행 상태를 나타냅니다:
-# "initial": 시작하기 전
-# "preparing": 준비 중 (랜덤 대기 시간)
-# "ready_to_click": 클릭 대기 중
-# "testing_complete": 테스트 완료 및 결과 표시
-if "test_state" not in st.session_state:
-    st.session_state.test_state = "initial"
-if "start_time" not in st.session_state:
-    st.session_state.start_time = 0.0
-if "reaction_time" not in st.session_state:
-    st.session_state.reaction_time = None
-if "target_wait_end_time" not in st.session_state:
-    st.session_state.target_wait_end_time = 0.0
+# 🎯 단어 사전
+word_list = [
+    "사과", "과자", "자동차", "차표", "표정", "정보", "보리", "리본", "본문", "문장", "장갑", "갑옷",
+    "옷걸이", "이름", "음악", "학교", "요리", "이불", "룰렛", "트럭", "코끼리", "리더", "라마", "마스크",
+    "크레용", "용기", "기차", "차도", "도끼", "키위", "이상", "상자", "자리", "눈물", "물약"
+]
 
-# 1. 초기 상태: "시작하기" 버튼 표시
-if st.session_state.test_state == "initial":
-    if st.button("🕹 시작하기", key="start_button_initial"):
-        st.session_state.test_state = "preparing"
-        st.session_state.reaction_time = None # 이전 결과 초기화
-        # 랜덤 대기 시간을 설정합니다. (현재 시간 + 랜덤 시간)
-        st.session_state.target_wait_end_time = time.time() + random.uniform(2, 4)
-        st.rerun() # 상태가 변경되었으니 즉시 새로고침하여 다음 상태로 전환
+# 상태 초기화
+if "turn" not in st.session_state:
+    st.session_state.last_word = random.choice(word_list)
+    st.session_state.used_words = [st.session_state.last_word]
+    st.session_state.game_over = False
+    st.session_state.turn = "player"
+    st.session_state.result_message = ""
+    st.session_state.memo = []
 
-# 2. 준비 중 상태: "준비 중입니다..." 메시지 표시
-elif st.session_state.test_state == "preparing":
-    st.write("⏳ 준비 중입니다... 절대 클릭하지 마세요!")
-    
-    # 목표 대기 시간이 지났는지 확인합니다.
-    if time.time() >= st.session_state.target_wait_end_time:
-        st.session_state.test_state = "ready_to_click"
-        st.session_state.start_time = time.time() # 클릭 대기 시작 시간 기록
-        st.rerun() # 즉시 새로고침하여 클릭 대기 상태로 전환
+# 상태 표시
+st.markdown(f"**🗣️ 이전 단어:** `{st.session_state.last_word}`")
+st.markdown(f"[📖 `{st.session_state.last_word}` 뜻 보기](https://dic.daum.net/search.do?q={st.session_state.last_word})")
+st.markdown(f"**🔁 현재 턴:** `{ '👤 당신' if st.session_state.turn == 'player' else '💻 컴퓨터' }`")
+
+# 플레이어 차례
+if not st.session_state.game_over and st.session_state.turn == "player":
+    user_word = st.text_input("✏️ 다음 단어를 입력하세요").strip()
+
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        if st.button("✅ 제출하기"):
+            if not user_word:
+                st.warning("❗ 단어를 입력해주세요.")
+            elif user_word in st.session_state.used_words:
+                st.error("⚠️ 이미 사용된 단어입니다.")
+                st.session_state.result_message = "💻 컴퓨터 승리! 중복된 단어."
+                st.session_state.game_over = True
+            elif user_word[0] != st.session_state.last_word[-1]:
+                st.error(f"❌ 첫 글자가 `{st.session_state.last_word[-1]}` 이어야 해요.")
+                st.session_state.result_message = "💻 컴퓨터 승리! 시작 글자 오류."
+                st.session_state.game_over = True
+            elif user_word not in word_list:
+                st.error("📕 단어 사전에 없는 단어입니다.")
+                st.session_state.result_message = "💻 컴퓨터 승리! 단어 없음."
+                st.session_state.game_over = True
+            else:
+                st.success("⭕ 올바른 단어입니다!")
+                st.session_state.used_words.append(user_word)
+                st.session_state.last_word = user_word
+                st.session_state.turn = "computer"
+                st.experimental_rerun()
+    with col2:
+        if st.button("📝 이 단어 모르겠어요"):
+            if user_word and user_word not in st.session_state.memo:
+                st.session_state.memo.append(user_word)
+                st.info("✅ 메모장에 저장했습니다!")
+
+# 컴퓨터 차례
+elif not st.session_state.game_over and st.session_state.turn == "computer":
+    st.info("💻 컴퓨터가 단어를 생각 중입니다...")
+    last_char = st.session_state.last_word[-1]
+    candidates = [w for w in word_list if w[0] == last_char and w not in st.session_state.used_words]
+
+    if candidates:
+        computer_word = random.choice(candidates)
+        st.session_state.used_words.append(computer_word)
+        st.session_state.last_word = computer_word
+        st.session_state.turn = "player"
+        st.success(f"💻 컴퓨터의 단어: `{computer_word}`")
+        st.markdown(f"[📖 `{computer_word}` 뜻 보기](https://dic.daum.net/search.do?q={computer_word})")
     else:
-        # 아직 대기 중이라면, 사용자에게 버튼 클릭을 막기 위해 비활성화된 더미 버튼 표시
-        st.button("🚫 대기 중 (클릭 불가)", disabled=True, key="dummy_button_preparing")
-        # Streamlit은 상호작용이 있을 때만 리런되므로, 이 상태에서는 주기적인 리런이 필요하지 않습니다.
-        # 단, 사용자가 이 상태에서 아무것도 하지 않으면 `ready_to_click` 상태로 자동 전환되지 않고
-        # 무한정 'preparing'에 머물러 있을 수 있습니다.
-        # 이 문제를 해결하려면 Streamlit 외부에서 특정 시간 간격으로 리런을 트리거하거나,
-        # 사용자의 다른 액션을 기다려야 합니다.
-        # 하지만 Streamlit의 일반적인 동작 방식에서는 st.button 같은 위젯이 클릭되면 리런이 됩니다.
-        # 이 코드의 목적은 'delay'가 끝나는 시점에 UI가 바로 변하도록 하는 것이므로,
-        # 이 상태에서는 특별한 추가 `rerun()`이 없어도 됩니다.
+        st.success("🎉 당신의 승리입니다! 컴퓨터가 단어를 못 찾았어요.")
+        st.session_state.result_message = "🎉 당신 승리! 컴퓨터가 포기했어요."
+        st.session_state.game_over = True
 
-# 3. 클릭 대기 중 상태: "지금 클릭!" 버튼 표시
-elif st.session_state.test_state == "ready_to_click":
-    if st.button("👆 지금 클릭!", key="click_now_button"):
-        st.session_state.reaction_time = time.time() - st.session_state.start_time
-        st.session_state.test_state = "testing_complete"
-        st.rerun() # 테스트 완료 상태로 전환
+# 게임 종료
+if st.session_state.game_over:
+    st.markdown("## 🎊 게임 종료")
+    st.info(st.session_state.result_message)
 
-# 4. 테스트 완료 및 결과 표시 상태
-elif st.session_state.test_state == "testing_complete":
-    st.success(f"🎯 당신의 반응속도는 {st.session_state.reaction_time:.3f}초입니다!")
-    if st.button("🔁 다시 시작하기", key="restart_button_complete"):
-        st.session_state.test_state = "initial"
-        st.rerun() # 초기 상태로 돌아감
+    if st.button("🔄 다시 시작하기"):
+        st.session_state.last_word = random.choice(word_list)
+        st.session_state.used_words = [st.session_state.last_word]
+        st.session_state.game_over = False
+        st.session_state.turn = "player"
+        st.session_state.result_message = ""
+
+# 메모장 보기
+if st.session_state.memo:
+    st.markdown("### 📒 내가 모르는 단어 메모장")
+    st.write("클릭하면 뜻 보기 링크로 이동해요.")
+    for m in st.session_state.memo:
+        st.markdown(f"- [📖 {m} 뜻 보기](https://dic.daum.net/search.do?q={m})")
+
+    # 저장 버튼
+    memo_text = "\n".join(st.session_state.memo)
+    st.download_button(
+        label="📥 메모장 저장 (.txt)",
+        data=memo_text,
+        file_name="my_word_memo.txt",
+        mime="text/plain"
+    )
