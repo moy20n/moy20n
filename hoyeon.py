@@ -8,7 +8,7 @@ st.title("🧠 끝말잇기 챌린지 (풀옵션)")
 # ✅ 대형 단어 리스트 로드
 @st.cache_data
 def load_words():
-    path = "words_korean_large.txt"
+    path = "korean_vocab_5965.txt"
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             words = [line.strip() for line in f if len(line.strip()) >= 2]
